@@ -24,16 +24,17 @@ export default function TransactionTable({
   const [warehouseFilter, setWarehouseFilter] = useState('all')
 
   const visibleTransactions = useMemo(() => {
-    return transactions
-      .filter((t) => typeFilter === 'all' || t.type === typeFilter)
-      .filter(
-        (t) => warehouseFilter === 'all' || t.warehouseName === warehouseFilter,
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      )
-  }, [transactions, typeFilter, warehouseFilter])
+  return [...transactions]
+    .filter((t) => typeFilter === 'all' || t.type === typeFilter)
+    .filter(
+      (t) => warehouseFilter === 'all' || t.warehouseName === warehouseFilter,
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() -
+        new Date(a.timestamp).getTime(),
+    )
+}, [transactions, typeFilter, warehouseFilter])
 
   return (
     <>
