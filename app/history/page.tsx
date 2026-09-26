@@ -1,10 +1,13 @@
 import DashboardShell from '@/components/DashboardShell'
 import TransactionTable from '@/components/TransactionTable'
-import { transactions } from '@/lib/seed-data'
 
 export const dynamic = 'force-dynamic'
 
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  // Fetch from the local API route
+  const res = await fetch('http://localhost:3000/api/transactions', { cache: 'no-store' });
+  const transactions = await res.json();
+
   return (
     <DashboardShell>
       <div className="page-header">
