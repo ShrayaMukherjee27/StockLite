@@ -39,9 +39,13 @@ export type StaffUser = {
 export type StockStatus = 'ok' | 'low' | 'critical'
 
 export function getStockStatus(product: Product): StockStatus {
-  if (product.currentStock < product.reorderThreshold) return 'critical'
-  if (product.currentStock === product.reorderThreshold) return 'low'
-  return 'ok'
+  if (product.currentStock <= 0) {
+    return 'critical';
+  }
+  if (product.currentStock <= product.reorderThreshold) {
+    return 'low';
+  }
+  return 'ok';
 }
 
 export function getStockStatusLabel(status: StockStatus): string {
