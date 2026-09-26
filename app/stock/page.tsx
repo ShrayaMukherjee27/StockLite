@@ -1,16 +1,18 @@
 import DashboardShell from '@/components/DashboardShell'
 import StockForm from '@/components/StockForm'
-import { products } from '@/lib/seed-data'
 
 export const dynamic = 'force-dynamic'
 
-export default function StockPage() {
+export default async function StockPage() {
+  const res = await fetch('http://localhost:3000/api/items', { cache: 'no-store' })
+  const products = await res.json()
+
   return (
     <DashboardShell>
       <div className="page-header">
         <div>
-          <h1>Stock In / Stock Out</h1>
-          <p>Record incoming or outgoing stock for a single warehouse.</p>
+          <h1>Stock In / Out</h1>
+          <p>Record incoming shipments or outgoing orders.</p>
         </div>
       </div>
       <StockForm products={products} />
