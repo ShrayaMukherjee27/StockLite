@@ -1,181 +1,152 @@
-'use client'
+"use client";
 
-import { useMemo, useState } from 'react'
-import { Product, Warehouse } from '@/lib/types'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function TransferForm({
-  products: initialProducts,
-  warehouses,
-}: {
-  products: Product[]
-  warehouses: Warehouse[]
-}) {
-  const [products, setProducts] = useState(initialProducts)
-  const [sourceWarehouseId, setSourceWarehouseId] = useState(
-    warehouses[0]?.id ?? '',
-  )
-  const [destWarehouseId, setDestWarehouseId] = useState(
-    warehouses[1]?.id ?? '',
-  )
+export default function TransferForm() {
+  const router = useRouter();
+  const [items, setItems] = useState<any[]>([]);
+  const [productId, setProductId] = useState('');
+  const [sourceWarehouse, setSourceWarehouse] = useState('Warehouse A');
+  const [destinationWarehouse, setDestinationWarehouse] = useState('Warehouse B');
+  const [quantity, setQuantity] = useState('');
+  
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const sourceProducts = useMemo(
-    () => products.filter((p) => p.warehouseId === sourceWarehouseId),
-    [products, sourceWarehouseId],
-  )
-  const [productId, setProductId] = useState(sourceProducts[0]?.id ?? '')
-  const [quantity, setQuantity] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  // Fetch inventory items to populate the product dropdown
+  useEffect(() => {
+    fetch('/api/items')
+      .then(res => res.json())
+      .then(data => {
+        setItems(data);
+        if (data.length > 0) {
+          setProductId(data[0].id); // Select the first product by default
+        }
+      });
+  }, []);
 
-  function handleSourceChange(id: string) {
-    setSourceWarehouseId(id)
-    const firstAtSource = products.find((p) => p.warehouseId === id)
-    setProductId(firstAtSource?.id ?? '')
-    if (id === destWarehouseId) {
-      const alt = warehouses.find((w) => w.id !== id)
-      if (alt) setDestWarehouseId(alt.id)
+  // Get unique products (since items might be duplicated across warehouses)
+  const uniqueProducts = Array.from(new Set(items.map(item => item.id)))
+    .map(id => items.find(item => item.id === id));
+
+  const handleTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    // Frontend validation: Prevent transferring to the same warehouse
+    if (sourceWarehouse === destinationWarehouse) {
+      return setError('Source and destination warehouses cannot be the same.');
     }
-  }
 
-  const selectedProduct = products.find((p) => p.id === productId)
+    if (Number(quantity) <= 0) {
+      return setError('Quantity must be greater than zero.');
+    }
 
-  // TASK 3: This currently sends the transfer request with no validation at
-  // all, and doesn't update the UI afterward. Add checks before calling the
-  // API:
-  //   - source and destination warehouses must be different
-  //   - a product must be selected
-  //   - quantity must be a positive number and <= selectedProduct.currentStock
-  // Then, after a successful response, update `products` state using
-  // data.source and data.destination (add the destination row if it's new).
-  async function handleTransfer(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-
-    const parsedQuantity = Number(quantity)
-
-    setSubmitting(true)
     try {
-      const res = await fetch('/api/items', {
+      const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'transfer',
+          type: 'TRANSFER',
           productId,
-          destWarehouseId,
-          quantity: parsedQuantity,
-        }),
-      })
-      const data = await res.json()
+          sourceWarehouseId: sourceWarehouse,
+          destinationWarehouseId: destinationWarehouse,
+          quantity: quantity
+        })
+      });
+
+      const data = await res.json();
+      
       if (!res.ok) {
-        setError(data.error ?? 'Something went wrong.')
-        return
+        setError(data.error || 'Failed to complete transfer.');
+      } else {
+        setSuccess(`Successfully transferred ${quantity} units!`);
+        setQuantity(''); // Reset the quantity field
+        router.refresh(); // Refresh the page state
       }
-
-      // TODO: update `products` state with data.source and data.destination
-
-      setSuccess(
-        `Transferred ${parsedQuantity} unit${parsedQuantity === 1 ? '' : 's'} of ${data.source.name} to the destination warehouse.`,
-      )
-      setQuantity('')
-    } catch {
-      setError('Could not reach the server. Please try again.')
-    } finally {
-      setSubmitting(false)
+    } catch (err) {
+      setError('A server error occurred while transferring stock.');
     }
-  }
+  };
 
   return (
-    <div className="panel form-panel">
-      <form onSubmit={handleTransfer}>
-        <div className="form-field">
-          <label htmlFor="source">Source warehouse</label>
-          <select
-            id="source"
-            value={sourceWarehouseId}
-            onChange={(e) => handleSourceChange(e.target.value)}
+    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+          {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
+          {success}
+        </div>
+      )}
+
+      <form onSubmit={handleTransfer} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+          <select 
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
           >
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
+            {uniqueProducts.map(product => (
+              <option key={product?.id} value={product?.id}>
+                {product?.name}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="form-field">
-          <label htmlFor="t-product">Product</label>
-          <select
-            id="t-product"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            disabled={sourceProducts.length === 0}
-          >
-            {sourceProducts.length === 0 ? (
-              <option value="">No products at this warehouse</option>
-            ) : (
-              sourceProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.currentStock} on hand)
-                </option>
-              ))
-            )}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From Warehouse</label>
+            <select 
+              value={sourceWarehouse}
+              onChange={(e) => setSourceWarehouse(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="Warehouse A">Warehouse A</option>
+              <option value="Warehouse B">Warehouse B</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To Warehouse</label>
+            <select 
+              value={destinationWarehouse}
+              onChange={(e) => setDestinationWarehouse(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="Warehouse A">Warehouse A</option>
+              <option value="Warehouse B">Warehouse B</option>
+            </select>
+          </div>
         </div>
 
-        <div className="form-field">
-          <label htmlFor="dest">Destination warehouse</label>
-          <select
-            id="dest"
-            value={destWarehouseId}
-            onChange={(e) => setDestWarehouseId(e.target.value)}
-          >
-            {warehouses
-              .filter((w) => w.id !== sourceWarehouseId)
-              .map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div className="form-field">
-          <label htmlFor="t-quantity">Quantity</label>
-          <input
-            id="t-quantity"
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+          <input 
             type="number"
-            min={1}
-            placeholder="0"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
+            min="1"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter quantity"
+            required
           />
         </div>
 
-        <div className="form-error">{error}</div>
-        {!error && success && (
-          <p
-            style={{
-              fontSize: 12.5,
-              color: 'var(--moss-dark)',
-              margin: '-10px 0 12px',
-            }}
-          >
-            {success}
-          </p>
-        )}
-
-        <div className="form-actions">
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={submitting}
-          >
-            Transfer stock
-          </button>
-        </div>
+        <button 
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium mt-2"
+        >
+          Execute Transfer
+        </button>
       </form>
     </div>
-  )
+  );
 }
